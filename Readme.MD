@@ -1,4 +1,11 @@
 README: OneNote COM Vanilla AddIn 
+
+modified by chenshi
+
+this is a task manage plugin
+
+
+
 ===================
 1 - Overview
 ===================
