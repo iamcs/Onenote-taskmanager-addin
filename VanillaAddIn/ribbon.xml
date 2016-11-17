@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" loadImage="GetImage">
+  <ribbon>
+    <tabs>
+      <tab id="tabmyaddin" label="任务管理">
+        <group id="groupmyaddin" label="任务管理">
+          <button id="buttonstartup" label="新建      " size="large" screentip="新建任务" onAction="newtask" image="Logo.png"/>
+          <button id="buttonend" label="总览       " size="large" screentip="收集未完成页面至OVERVIEW" onAction="refreshoverview" image="Logo2.png"/>
+          <button id="buttonsort" label="整理      " size="large" screentip="整理本页面任务" onAction="sortcurrentpage" image="Logo1.png"/>
+          <button id="navito" label="转到      " size="large" screentip="转到OVERVIEW" onAction="navito" image="navito.png"/>
+        </group>
+        <group id="misc" label="关于">
+          <button id="about" label="关于      " size="large" screentip="关于本插件" onAction="about" image="about.png"/>
+          <button id="getxml" label="XML      " size="large" screentip="获取本页XML" onAction="getxml" image="getxml.png"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>
