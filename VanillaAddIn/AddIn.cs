@@ -3,7 +3,6 @@
  */
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing.Imaging;
 using System.IO;
@@ -12,13 +11,11 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml.Linq;
 using Extensibility;
 using Microsoft.Office.Core;
 using MyApplication.VanillaAddIn.Utilities;
 using Application = Microsoft.Office.Interop.OneNote.Application;  // Conflicts with System.Windows.Forms
 using Microsoft.Office.Interop.OneNote;
-using System.Xml;
 
 #pragma warning disable CS3003 // Type is not CLS-compliant
 
@@ -119,6 +116,7 @@ namespace MyApplication.VanillaAddIn
             //thread.Start();
             OperateOnenote op = new OperateOnenote(OneNoteApplication);
             op.createtodopage();
+            OneNoteApplication.NavigateTo(op.getpageid("OVERVIEW"), "", false);
             return;
             //SetOneNoteApplication.
                     }
@@ -152,7 +150,8 @@ namespace MyApplication.VanillaAddIn
 
         public async Task about(IRibbonControl control)
         {
-            string aboutline = "               任务管理插件\r\n\r\n          by STAN CHENS\r\n                VER:" + VER+ "\r\n         all rights reserved\r\n             保留所有权利           ";
+            //string aboutline = "               任务管理插件\r\n\r\n          by STAN CHENS\r\n                VER:" + VER+ "\r\n         all rights reserved\r\n             保留所有权利           ";
+            string aboutline = "任务管理插件:\r\n\r\n1.新建。添加带时间标记的事项，能被--总览--识别。\r\n\r\n2.总览。收集带有ctrl+123类tag的条目，在名叫OVERVIEW的页面生成月计划表和总进度表。（ctrl+1：普通事项。ctrl+2：紧急事项。3：ctrl+3：复习事项。）\r\n\r\n3.整理。将本页面的ctrl+1tag中，完成的项置顶。\r\n\r\n4.转到。转到2中生成的OVERVIEW页面。\r\n\r\n                               by STAN CHENS";
             IntPtr myWindowHandle = new IntPtr((long)this.OneNoteApplication.Windows.CurrentWindow.WindowHandle);
             NativeWindow nativeWindow = new NativeWindow();
             nativeWindow.AssignHandle(myWindowHandle);
@@ -163,6 +162,14 @@ namespace MyApplication.VanillaAddIn
         {
             OperateOnenote op = new OperateOnenote(OneNoteApplication);
             OneNoteApplication.NavigateTo(op.getpageid("OVERVIEW"),"",false);
+            var sumline = op.gettodolastline();
+            if (sumline != null)
+            {
+                IntPtr myWindowHandle = new IntPtr((long)this.OneNoteApplication.Windows.CurrentWindow.WindowHandle);
+                NativeWindow nativeWindow = new NativeWindow();
+                nativeWindow.AssignHandle(myWindowHandle);
+                MessageBox.Show(nativeWindow, sumline);
+            }            
             return;
         }
         public async Task getxml(IRibbonControl control)

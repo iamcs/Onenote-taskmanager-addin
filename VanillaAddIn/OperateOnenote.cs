@@ -1,15 +1,13 @@
 ﻿using Microsoft.Office.Interop.OneNote;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
 using Application = Microsoft.Office.Interop.OneNote.Application;
 using System.IO;
 using System.Collections;
-using System.Threading;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace MyApplication.VanillaAddIn
 {
@@ -513,12 +511,18 @@ namespace MyApplication.VanillaAddIn
             creattable(7, 5, oenodelist,oec, xml);
             //this.OneNoteApplication.UpdatePageContent(xml.InnerXml, DateTime.MinValue);
         }
-        
+
         //create a treeed todo section-page  based on a existed blank todo page
         public void createtodopage() 
         {
+            //initialnize 
+            int allunfinished = 0;
+            int allfinished = 0;
+            int allsuspended = 0;
+            int alltoreview = 0;
+
             //get id of todo page
-            var todoid = getpageid("OVERVIEW");
+            string todoid = getpageid("OVERVIEW");
             if (todoid == null)
             {
                 IntPtr myWindowHandle = new IntPtr((long)this.OneNoteApplication.Windows.CurrentWindow.WindowHandle);
@@ -537,8 +541,7 @@ namespace MyApplication.VanillaAddIn
             creattimetasktable(targetwholexml);
 
             addtagdef(targetwholexml);
-
-                      
+                                  
             //loop through notebook to get all task
             XmlNode sectionnode;
             sectionnode = targetwholexml.SelectSingleNode("//one:OEChildren", onenotenamespace);
@@ -554,7 +557,8 @@ namespace MyApplication.VanillaAddIn
                     var inpagexml = GetPageContent(pageid);
                     string tagdef0Index = "\"\"";
                     string tagdef1Index = "\"\"";
-                    //get index of tag, type 0 -> task, type 1 -> suspended
+                    string tagdef2Index = "\"\"";
+                    //get index of tag, type 0 -> task, type 1 -> important, type 2 -> need to review
                     XmlNode tagdef0 = inpagexml.SelectSingleNode("/one:Page/one:TagDef[@type = \"0\"]", onenotenamespace);
                     if(tagdef0 != null)
                     {
@@ -566,10 +570,15 @@ namespace MyApplication.VanillaAddIn
                     {
                         tagdef1Index = tagdef1.Attributes.GetNamedItem("index").Value;
                     }
+                    XmlNode tagdef2 = inpagexml.SelectSingleNode("/one:Page/one:TagDef[@type = \"2\"]", onenotenamespace);
+                    if (tagdef2 != null)
+                    {
+                        tagdef2Index = tagdef2.Attributes.GetNamedItem("index").Value;
+                    }
 
-                    
+
                     //if page have tagdef then contine
-                    if (tagdef0 != null || tagdef1!= null)
+                    if (tagdef0 != null || tagdef1!= null || tagdef1 != null)
                     {
                         //get all task tags
                         XmlNodeList tasktags = inpagexml.SelectNodes("//one:Tag[@index = " + tagdef0Index + "]", onenotenamespace);
@@ -592,6 +601,9 @@ namespace MyApplication.VanillaAddIn
                         //get all suspended tags
                         XmlNodeList suspendedtags = inpagexml.SelectNodes("//one:Tag[@index = " + tagdef1Index + "]", onenotenamespace);
                         int CountOfSuspended = suspendedtags.Count;
+                        //get all need to review tags
+                        XmlNodeList NeedToReviewTags = inpagexml.SelectNodes("//one:Tag[@index = " + tagdef2Index + "]", onenotenamespace);
+                        int CountOfNeedToReviewTags = NeedToReviewTags.Count;
                         /***XmlNodeList completedtags = inpagexml.SelectNodes("//one:Tag[@completed = \"true\"]", onenotenamespace);
                         int? numcompleted = completedtags.Count;
                         foreach (XmlNode z in completedtags)
@@ -599,7 +611,7 @@ namespace MyApplication.VanillaAddIn
                             z.ParentNode.RemoveChild(z);
                         }
                         int? numincompleted = inpagexml.SelectNodes("//one:Tag", onenotenamespace).Count;***/
-                        if (CountOffinished != 0 || CountOfUnfinished != 0 || CountOfSuspended!=0)
+                        if (CountOffinished != 0 || CountOfUnfinished != 0 || CountOfSuspended!=0 || CountOfNeedToReviewTags!=0)
                         {
                             //get link of page
                             string link;
@@ -608,28 +620,71 @@ namespace MyApplication.VanillaAddIn
                             XmlElement line0 = targetwholexml.CreateElement("one", "OEChildren", NS);
                             XmlElement line1 = targetwholexml.CreateElement("one", "OE", NS);
                             XmlElement line2 = targetwholexml.CreateElement("one", "T", NS);
-                            XmlCDataSection cdata = targetwholexml.CreateCDataSection(addvirtualline(CountOffinished, CountOfUnfinished, CountOfSuspended, x.Attributes.GetNamedItem("name").Value, link));
+                            XmlCDataSection cdata = targetwholexml.CreateCDataSection(addvirtualline(CountOffinished, CountOfUnfinished, CountOfSuspended, CountOfNeedToReviewTags, x.Attributes.GetNamedItem("name").Value, link));
 
                             sectionnode.AppendChild(line0);
                             line0.AppendChild(line1);
                             line1.AppendChild(line2);
                             line2.AppendChild(cdata);
                         }
+                        allfinished = allfinished + CountOffinished;
+                        allunfinished = allunfinished + CountOfUnfinished;
+                        allsuspended = allsuspended + CountOfSuspended;
+                        alltoreview = alltoreview + CountOfNeedToReviewTags;
                     }
                    
                 }
             }
+            //add a summarize line
+            string sumline = "已完成：" + allfinished+"项。" + "紧急：" + allsuspended + "项。" + "需复习：" + alltoreview + "项。" + "未完成：" + allunfinished + "项。" ;
+            sectionnode = AddPageline(targetwholexml, sumline, linetype.oeline);
+            //remove blank node
             removeblank(ref targetwholexml);
-                      
+            //update page
             OneNoteApplication.UpdatePageContent(targetwholexml.InnerXml, DateTime.MinValue);
         }
 
+        //get the last line of overview page, expected to be sumline.
+        public string gettodolastline()
+        {
+            string sumline = "";
+
+            string todoid = getpageid("OVERVIEW");
+            if (todoid == null)
+            {
+                IntPtr myWindowHandle = new IntPtr((long)this.OneNoteApplication.Windows.CurrentWindow.WindowHandle);
+                NativeWindow nativeWindow = new NativeWindow();
+                nativeWindow.AssignHandle(myWindowHandle);
+                MessageBox.Show(nativeWindow, "没有找到名为“OVERVIEW”的页面，请选择一个分区新建此页面！");
+                return null;
+            }
+
+            //get page xml of page
+            var targetwholexml = GetPageContent(todoid);
+            //find oechildren node
+            XmlNode oec = targetwholexml.SelectSingleNode("//one:OEChildren", onenotenamespace);
+            //get all the oe-nodes of the first oechildren node
+            XmlNodeList oes = oec.SelectNodes("//one:OE", onenotenamespace);
+            //get the last oe node 
+            XmlNode oe = oes.Item(oes.Count - 1);
+            //get the content of the last oe line, also the sumline
+            sumline = oe.InnerText;
+            //format string: remove <>
+            sumline = sumline.Substring(sumline.IndexOf("已"), (sumline.LastIndexOf("项") - sumline.IndexOf("已") + 1)) + "。";
+            while (sumline.IndexOf("<") != -1)
+            {
+                sumline = sumline.Remove(sumline.IndexOf("<"), sumline.IndexOf(">")- sumline.IndexOf("<") + 1);
+            }            
+            
+            return sumline;
+        }
         //creat vitrual line for cdata
-        public string addvirtualline(int? completed, int? incompleted, int? suspended, string pagename,string link)
+        public string addvirtualline(int? completed, int? incompleted, int? suspended, int? toreview, string pagename,string link)
         {
             string completedstr = completed.ToString();
             string incompletedstr = incompleted.ToString();
             string suspendedstr = suspended.ToString();
+            string toreviewstr = toreview.ToString();
             string line;
             //create completedstr
             if (completed != 0)
@@ -671,8 +726,22 @@ namespace MyApplication.VanillaAddIn
             {
                 suspendedstr = "";
             }
+            //create toreview str
+            if (toreview != 0)
+            {
+                while (toreview  >= 1)
+                {
+                    toreviewstr = toreviewstr + " ";
+                    toreview--;
+                }
+                toreviewstr = "<span style = 'background:aqua;mso-highlight:aqua' >" + toreviewstr + "</ span >";//<span style = 'background:aqua;mso-highlight:aqua' >
+            }
+            else
+            {
+                toreviewstr = "";
+            }
             //create out line
-            line = "<a href=\"" + link + "\"> " + pagename + " </span> </a>" + completedstr + suspendedstr + incompletedstr;
+            line = "<a href=\"" + link + "\"> " + pagename + " </span> </a>" + completedstr + toreviewstr + suspendedstr + incompletedstr;
             return line;
         }
 
